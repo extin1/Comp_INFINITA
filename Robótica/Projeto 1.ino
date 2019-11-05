@@ -1,3 +1,5 @@
+/* ATENÇÃO: Nosso robô usa shield RoboCore e Arduíno Uno */
+
 #define dirAPin 7
 #define dirBPin 8
 #define SEsq A1 //sensor esq
