@@ -1,0 +1,148 @@
+#include <SoftwareSerial.h>
+#include <XBee.h>
+
+
+
+const int pinoDirA = 7;
+const int pinoDirB = 8;
+const int pinoSpeedEsq = 5; //Lado esquerdo
+const int pinoSpeedDir = 6; //Lado direito
+const int pinoSensorDir = 2;
+const int pinoSensorEsq = 1;
+const int pinoSensorSpeedDir = 12;
+const int pinoSensorSpeedEsq = 11;
+int DirDigital;
+int EsqDigital;
+int SpeedEsq=150;
+int SpeedDir=150;
+int limSpeedDir=100;
+int limSpeedEsq=100;
+int countE = 0;
+int countD = 0;
+int auxDigitalD;
+int auxDigitalE;
+unsigned long inicio;
+unsigned long fim;
+long duration;
+int trigPin = 9;
+int echoPin = 13;
+long distancia=10;
+unsigned long mark;
+long delay_time;
+String string;
+uint8_t payload[30]={0};
+XBee xbee = XBee();
+Tx16Request tx = Tx16Request(0x0, payload, sizeof(payload));
+SoftwareSerial sSerial = SoftwareSerial(2,3);
+
+//Função de leitura
+long readUS(){
+  
+  long distance;
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  duration = pulseIn(echoPin, HIGH);
+  distance = duration*0.034/2;
+  return distance;
+}
+
+void converttovector(String& text){
+  for(int i=0;i<text.length();i++){
+    payload[i] = uint8_t(text[i]);
+    
+  } 
+}
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  pinMode(pinoSensorSpeedDir, INPUT);
+  pinMode(pinoSensorSpeedEsq, INPUT);
+  pinMode(pinoDirA, OUTPUT);
+  pinMode(pinoDirB, OUTPUT);
+  pinMode(pinoSpeedEsq, OUTPUT);
+  pinMode(pinoSpeedDir, OUTPUT);
+  pinMode(pinoSensorDir, INPUT);
+  pinMode(pinoSensorEsq, INPUT);
+  digitalWrite(pinoDirA, LOW);
+  digitalWrite(pinoDirB, LOW);
+  sSerial.begin(9600);
+  xbee.setSerial(sSerial);
+  
+}
+
+void loop() {
+
+  distancia = readUS();
+  Serial.print(distancia);
+  
+  if(distancia > 20 ){
+  
+    analogWrite(pinoSpeedDir, SpeedDir);
+    analogWrite(pinoSpeedEsq, SpeedEsq);
+  
+    DirDigital = digitalRead(pinoSensorSpeedDir);
+    EsqDigital = digitalRead(pinoSensorSpeedEsq);
+  
+    if(auxDigitalD != DirDigital){
+          countD += 1;  
+          auxDigitalD = DirDigital;
+               
+    }
+      
+    if(auxDigitalE != EsqDigital){
+          countE += 1;  
+          auxDigitalE = EsqDigital;
+    }
+  
+    if(millis() - fim > 20){
+     
+    if(countD - countE > 0 && SpeedEsq < 180){
+      SpeedEsq += 1;
+    }
+    if(countD - countE > 0 && SpeedDir > limSpeedDir){
+      SpeedDir -= 1;
+    }
+    if(countE - countD > 0 && SpeedDir < 180){
+      SpeedDir += 1;
+    }
+    if(countE - countD > 0 && SpeedEsq > limSpeedEsq){
+      SpeedEsq -= 1;
+    }
+    countD=0;
+    countE=0;
+    fim = millis();           
+   }
+  }
+  if(distancia < 20 ){
+    analogWrite(pinoSpeedDir, 0);
+    analogWrite(pinoSpeedEsq, 0);
+      
+    if(millis()- mark > delay_time){
+  
+          string = "Pedro parou!";  
+          converttovector(string);
+          tx.setPayload(payload);
+          tx.setPayloadLength(sizeof(payload));
+          xbee.send(tx);
+          Serial.print("Packet sent: ");
+          for(int j; j < string.length();j++){
+            Serial.print(char(payload[j]));
+          }
+          memset(payload, 0, sizeof(payload));
+          Serial.println("");
+  
+        delay_time= random(100,300);
+        mark=millis();
+     
+       
+    }
+    delay(1000);
+    analogWrite(pinoSpeedEsq, 230);
+    delay(500);
+  }     
+}
