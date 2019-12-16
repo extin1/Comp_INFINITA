@@ -1,0 +1,156 @@
+// NÃO MUDEI OS PINOS DA rodaEsq e rodaDir
+
+#include "Ultrasonic.h" //INCLUSÃO DA BIBLIOTECA NECESSÁRIA PARA FUNCIONAMENTO DO CÓDIGO
+#include <XBee.h>
+#include <SoftwareSerial.h>
+
+#define rodaEsq 6
+#define rodaDir 5
+#define sensorEsq A1
+#define sensorDir A0
+
+int flag = 0;
+
+int distancia; //VARIÁVEL DO TIPO INTEIRO
+String result; //VARIÁVEL DO TIPO STRING
+const int echoPin = 9; //PINO DIGITAL UTILIZADO PELO HC-SR04 ECHO(RECEBE)
+const int trigPin = 8; //PINO DIGITAL UTILIZADO PELO HC-SR04 TRIG(ENVIA)
+int countEsq = 0;
+int countDir = 0;
+unsigned long mark;
+int auxEsq;
+int giroEsq;
+int auxDir;
+int giroDir;
+int diferenca;
+int maxMotor = 120; 
+int minMotor = 60; 
+int maxBranco = 750;
+int velEsq = 120;
+int velDir = 120;
+int z = 0;
+int x;
+long aleatorio;
+
+Ultrasonic ultrasonic(trigPin,echoPin);
+XBee xbee = XBee();
+XBeeResponse response = XBeeResponse();
+Rx16Response rx16 = Rx16Response();
+uint8_t payload[50]={0};
+Tx16Request tx = Tx16Request(0x0, payload, sizeof(payload));
+SoftwareSerial sSerial = SoftwareSerial(2,3);
+
+// 40 ângulos
+
+void setup() {
+  Serial.begin(9600);
+  sSerial.begin(9600);
+  xbee.setSerial(sSerial);
+  pinMode(7, INPUT);
+  pinMode(6, INPUT);
+  pinMode(13,OUTPUT); 
+  pinMode(12,OUTPUT);
+  pinMode(rodaDir,OUTPUT);
+  pinMode(rodaEsq,OUTPUT);
+  digitalWrite(12,LOW);
+  digitalWrite(13,LOW);
+  analogWrite(6,maxMotor);
+  analogWrite(5,maxMotor);
+  pinMode(echoPin, INPUT);
+  pinMode(trigPin, OUTPUT);
+  mark=millis();
+  randomSeed(analogRead(0));
+}
+
+void loop() {
+	
+    z = 0;
+    x = hcsr04();
+
+    giroEsq = digitalRead(6); // PRECISO SABER QUAL O MEU PINO QUE GIRA PRA ESQUERDA
+     if(giroEsq != auxEsq){
+      countEsq++;
+      auxEsq = giroEsq;
+    }
+    
+    giroDir = digitalRead(7); // PRECISO SABER QUAL O MEU PINO QUE GIRA PRA DIREITA
+     if(giroDir != auxDir){
+      countDir++;
+      auxDir = giroDir;
+    }
+
+    if ( x > 20 ){
+       
+      if(millis() - mark > 10){
+        diferenca = countEsq - countDir;
+        countEsq=0;
+        countDir=0;
+		
+        if(velDir < maxMotor && diferenca > 0){
+          velDir+=1;
+          analogWrite(rodaDir,velDir);
+        } else if(velDir >= maxMotor && diferenca > 0){
+          if(velEsq > 0)
+            velEsq-=1;
+          analogWrite(rodaEsq,velEsq);
+        }
+        
+        if(velEsq < maxMotor && diferenca < 0){
+          velEsq+=1;
+          analogWrite(rodaEsq,velEsq);
+        } else if(velEsq >= maxMotor && diferenca < 0){
+          if(velDir > 0)
+            velDir-=1;
+          analogWrite(rodaDir,velDir);
+        }
+      diferenca = 0;  
+      mark=millis();
+    }
+	
+// VERIFICAR ESSA PARTE BUGADA
+} else {
+	payload[0] = 'X';
+    tx.setPayload(payload);
+    tx.setPayloadLength(sizeof(payload));
+    xbee.send(tx);
+    memset(payload,0,sizeof(payload));
+	z = 0;
+	aleatorio = random(0,2);
+    analogWrite(rodaDir,0);
+    analogWrite(rodaEsq,0);
+    
+    while(z < 10){
+      z++;
+      if(aleatorio == 0){
+      analogWrite(rodaDir,180);
+      analogWrite(rodaEsq,30);
+      } else{
+        analogWrite(rodaEsq,180);
+        analogWrite(rodaDir,30);
+      }
+      delay(100);
+    }
+	velDir = 120;
+    velEsq = 120;
+    analogWrite(rodaDir,velDir);
+    analogWrite(rodaEsq,velEsq);
+    
+}
+
+}
+
+//MÉTODO RESPONSÁVEL POR CALCULAR A DISTÂNCIA
+int hcsr04(){
+    digitalWrite(trigPin, LOW); //SETA O PINO 8 COM UM PULSO BAIXO "LOW"
+    delayMicroseconds(2); //INTERVALO DE 2 MICROSSEGUNDOS
+    digitalWrite(trigPin, HIGH); //SETA O PINO 8 COM PULSO ALTO "HIGH"
+    delayMicroseconds(10); //INTERVALO DE 10 MICROSSEGUNDOS
+    digitalWrite(trigPin, LOW); //SETA O PINO 8 COM PULSO BAIXO "LOW" NOVAMENTE
+    //FUNÇÃO RANGING, FAZ A CONVERSÃO DO TEMPO DE
+    //RESPOSTA DO ECHO EM CENTIMETROS, E ARMAZENA
+    //NA VARIAVEL "distancia"
+    distancia = (ultrasonic.Ranging(CM)); //VARIÁVEL GLOBAL RECEBE O VALOR DA DISTÂNCIA MEDIDA
+    result = String(distancia); //VARIÁVEL GLOBAL DO TIPO STRING RECEBE A DISTÂNCIA(CONVERTIDO DE INTEIRO PARA STRING)
+    //delay(20); //INTERVALO DE 500 MILISSEGUNDOS
+    return distancia;
+ }
