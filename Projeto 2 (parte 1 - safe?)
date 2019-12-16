@@ -47,7 +47,7 @@ void setup() {
   sSerial.begin(9600);
   xbee.setSerial(sSerial);
   pinMode(7, INPUT);
-  pinMode(6, INPUT);
+  pinMode(6, INPUT); // PRECISO MUDAR, POIS É O MESMO PINO DA rodaEsq
   pinMode(13,OUTPUT); 
   pinMode(12,OUTPUT);
   pinMode(rodaDir,OUTPUT);
